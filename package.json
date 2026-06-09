@@ -1,0 +1,13 @@
+{
+  "name": "devsecops-pipeline-lab",
+  "version": "1.0.0",
+  "description": "Lab CI/CD DevSecOps avec Gitleaks, Semgrep et Trivy",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "4.16.0",
+    "lodash": "4.17.15"
+  }
+}
