@@ -1,4 +1,4 @@
-# DevSecOps Shift-Left CI/CD Pipeline (SAST, SCA & Secret Detection)
+# Shift-Left CI/CD Pipeline (SAST, SCA & Secret Detection)
 
 Ce projet met en œuvre des contrôles de sécurité automatisés dans **GitHub Actions**, selon l'approche **Shift-Left Security**. Il vise à détecter les secrets, les failles du code et les dépendances vulnérables avant leur intégration dans la branche principale.
 
