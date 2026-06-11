@@ -6,7 +6,7 @@ Ce projet met en œuvre des contrôles de sécurité automatisés dans **GitHub 
 
 ### Problématique
 
-Des secrets exposés, du code dangereux ou des bibliothèques vulnérables peuvent être introduits lors des contributions. Une vérification manuelle ne suffit pas à contrôler systématiquement chaque modification.
+Des secrets exposés, du code dangereux ou des bibliothèques vulnérables peuvent être introduits lors des contributions. Une vérification  manuelle ne suffit pas à contrôler systématiquement chaque modification.
 
 ### Solution apportée
 
