@@ -6,47 +6,85 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions: {}
+
 jobs:
   # 1. Détection de secrets
   secret-scan:
     name: Gitleaks (Secrets Detection)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Requis pour les dépôts d'organisation
+          GITLEAKS_VERSION: '8.30.1'
+          GITLEAKS_ENABLE_COMMENTS: 'false'
 
   # 2. Analyse statique de sécurité du code (SAST)
   sast-scan:
     name: Semgrep (SAST)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Run Semgrep
+        env:
+          SEMGREP_IMAGE: semgrep/semgrep:1.179.0@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b
         run: |
-          docker run --rm -v "${{ github.workspace }}:/src" returntocorp/semgrep \
+          docker run --rm \
+            --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            --volume "$GITHUB_WORKSPACE:/src:ro" \
+            --workdir /src \
+            "$SEMGREP_IMAGE" \
             semgrep scan --config=auto --error --severity=ERROR /src
 
   # 3. Analyse des vulnérabilités de dépendances (SCA)
   sca-scan:
     name: Trivy (SCA Dependency Scan)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Run Trivy Vulnerability Scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: 'v0.75.0'
           scan-type: 'fs'
-          scan-ref: '.'
+          scan-ref: 'package-lock.json'
+          scanners: 'vuln'
           severity: 'CRITICAL,HIGH'
           exit-code: '1' # Fait échouer le job si une faille HIGH ou CRITICAL est trouvée

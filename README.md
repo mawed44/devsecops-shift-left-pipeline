@@ -32,7 +32,7 @@ Le [workflow](.github/workflows/evsecops-pipeline.yml) exécute trois scans comp
 - Échec des jobs lorsqu'une détection correspond aux seuils configurés.
 - Consultation des résultats et des logs dans l'onglet **Actions** du dépôt GitHub.
 
-L'analyse des dépendances npm par Trivy nécessite un `package-lock.json` généré et versionné dans le dépôt.
+Le `package-lock.json` fige les dépendances analysées par Trivy. Le job SCA les installe avec `npm ci --ignore-scripts --no-audit --no-fund` avant le scan. Les actions sont fixées par SHA, l'image Semgrep par empreinte SHA-256 et les permissions GitHub limitées à la lecture.
 
 ### Licence
 
