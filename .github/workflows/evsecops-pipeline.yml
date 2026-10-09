@@ -95,17 +95,18 @@ jobs:
       - name: Run Semgrep
         run: |
           mkdir -p reports
-          docker run --rm \
+          docker pull "$SEMGREP_IMAGE"
+          # Le runner écrit le SARIF ; le conteneur accède aux sources en lecture seule.
+          docker run --rm --pull=never \
             --cap-drop=ALL \
             --security-opt=no-new-privileges \
             --volume "$GITHUB_WORKSPACE:/src:ro" \
-            --volume "$GITHUB_WORKSPACE/reports:/reports" \
             --workdir /src \
             "$SEMGREP_IMAGE" \
             semgrep scan --config=p/default --config=.semgrep/rules \
               --exclude=.semgrep --exclude=tests --exclude=node_modules --exclude=reports \
               --error --severity=ERROR --metrics=off \
-              --sarif --output=/reports/semgrep.sarif .
+              --sarif . > reports/semgrep.sarif
 
       - name: Preserve Semgrep report even when the scan fails
         if: ${{ always() && hashFiles('reports/semgrep.sarif') != '' }}
