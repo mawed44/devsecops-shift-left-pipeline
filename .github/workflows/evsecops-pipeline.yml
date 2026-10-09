@@ -8,7 +8,44 @@ on:
 
 permissions: {}
 
+env:
+  SEMGREP_IMAGE: semgrep/semgrep:1.179.0@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b
+
 jobs:
+  tests:
+    name: Tests (Application and Semgrep Rules)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Test HTTP responses without executing shell commands
+        run: npm test
+
+      - name: Test Semgrep rule against vulnerable and safe examples
+        run: |
+          docker run --rm \
+            --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            --volume "$GITHUB_WORKSPACE:/src:ro" \
+            --workdir /src \
+            "$SEMGREP_IMAGE" \
+            semgrep --test .semgrep/rules --strict --metrics=off
+
   # 1. Détection de secrets
   secret-scan:
     name: Gitleaks (Secrets Detection)
@@ -31,6 +68,16 @@ jobs:
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Requis pour les dépôts d'organisation
           GITLEAKS_VERSION: '8.30.1'
           GITLEAKS_ENABLE_COMMENTS: 'false'
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
+
+      - name: Preserve Gitleaks report even when the scan fails
+        if: ${{ always() && hashFiles('results.sarif') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-gitleaks
+          path: results.sarif
+          retention-days: 30
+          if-no-files-found: error
 
   # 2. Analyse statique de sécurité du code (SAST)
   sast-scan:
@@ -46,16 +93,28 @@ jobs:
           persist-credentials: false
 
       - name: Run Semgrep
-        env:
-          SEMGREP_IMAGE: semgrep/semgrep:1.179.0@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b
         run: |
+          mkdir -p reports
           docker run --rm \
             --cap-drop=ALL \
             --security-opt=no-new-privileges \
             --volume "$GITHUB_WORKSPACE:/src:ro" \
+            --volume "$GITHUB_WORKSPACE/reports:/reports" \
             --workdir /src \
             "$SEMGREP_IMAGE" \
-            semgrep scan --config=auto --error --severity=ERROR /src
+            semgrep scan --config=auto --config=.semgrep/rules \
+              --exclude=.semgrep --exclude=tests --exclude=node_modules --exclude=reports \
+              --error --severity=ERROR --metrics=off \
+              --sarif --output=/reports/semgrep.sarif .
+
+      - name: Preserve Semgrep report even when the scan fails
+        if: ${{ always() && hashFiles('reports/semgrep.sarif') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-semgrep
+          path: reports/semgrep.sarif
+          retention-days: 30
+          if-no-files-found: error
 
   # 3. Analyse des vulnérabilités de dépendances (SCA)
   sca-scan:
@@ -87,4 +146,61 @@ jobs:
           scan-ref: 'package-lock.json'
           scanners: 'vuln'
           severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: 'trivy.sarif'
+          limit-severities-for-sarif: true
           exit-code: '1' # Fait échouer le job si une faille HIGH ou CRITICAL est trouvée
+
+      - name: Preserve Trivy report even when the scan fails
+        if: ${{ always() && hashFiles('trivy.sarif') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-trivy
+          path: trivy.sarif
+          retention-days: 30
+          if-no-files-found: error
+
+  # Seul ce job dispose du droit de publier des alertes de sécurité.
+  publish-security-results:
+    name: Publish SARIF to Code scanning
+    needs: [secret-scan, sast-scan, sca-scan]
+    if: ${{ always() && !cancelled() && github.event.repository.private == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download available security reports
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: security-*
+          path: reports
+          merge-multiple: true
+
+      - name: Publish Gitleaks results
+        if: ${{ !cancelled() && hashFiles('reports/results.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: reports/results.sarif
+          category: gitleaks
+
+      - name: Publish Semgrep results
+        if: ${{ !cancelled() && hashFiles('reports/semgrep.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: reports/semgrep.sarif
+          category: semgrep
+
+      - name: Publish Trivy results
+        if: ${{ !cancelled() && hashFiles('reports/trivy.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: reports/trivy.sarif
+          category: trivy

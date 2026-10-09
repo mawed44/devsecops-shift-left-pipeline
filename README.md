@@ -1,5 +1,7 @@
 # Shift-Left CI/CD Pipeline (SAST, SCA & Secret Detection)
 
+[![CI](https://github.com/mawed44/devsecops-shift-left-pipeline/actions/workflows/evsecops-pipeline.yml/badge.svg)](https://github.com/mawed44/devsecops-shift-left-pipeline/actions/workflows/evsecops-pipeline.yml)
+
 Ce projet met en œuvre des contrôles de sécurité automatisés dans **GitHub Actions**, selon l'approche **Shift-Left Security**. Il vise à détecter les secrets, les failles du code et les dépendances vulnérables avant leur intégration dans la branche principale.
 
 ---
@@ -30,9 +32,19 @@ Le [workflow](.github/workflows/evsecops-pipeline.yml) exécute trois scans comp
 
 - Signalement des secrets, des constructions dangereuses et des dépendances vulnérables couverts par les scans.
 - Échec des jobs lorsqu'une détection correspond aux seuils configurés.
-- Consultation des résultats et des logs dans l'onglet **Actions** du dépôt GitHub.
+- Rapports SARIF téléchargeables dans **Actions**, conservés 30 jours même si un scan échoue.
+- Publication des alertes dans **Security → Code scanning** pour les dépôts publics.
 
-Le `package-lock.json` fige les dépendances analysées par Trivy. Le job SCA les installe avec `npm ci --ignore-scripts --no-audit --no-fund` avant le scan. Les actions sont fixées par SHA, l'image Semgrep par empreinte SHA-256 et les permissions GitHub limitées à la lecture.
+Le `package-lock.json` fige les dépendances analysées par Trivy. Les actions sont fixées par SHA et l'image Semgrep par empreinte SHA-256. Seul le job de publication possède la permission `security-events: write`.
+
+### Tests
+
+```bash
+npm ci --ignore-scripts --no-audit --no-fund
+npm test
+```
+
+Le job **Tests** vérifie les réponses HTTP avec une exécution de commandes simulée, puis teste la [règle Semgrep](.semgrep/rules/query-to-exec.yml) sur des exemples vulnérables et sûrs. L'application reste volontairement vulnérable : les tests peuvent réussir tandis que les scans de sécurité échouent.
 
 ### Licence
 

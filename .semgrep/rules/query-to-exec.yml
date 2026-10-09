@@ -1,0 +1,19 @@
+rules:
+  - id: query-to-exec
+    languages: [javascript]
+    severity: ERROR
+    message: Ne pas transmettre un paramètre HTTP à exec ; utiliser une commande fixe et des arguments validés avec execFile sans shell.
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-78: Improper Neutralization of Special Elements used in an OS Command'
+      confidence: HIGH
+    mode: taint
+    pattern-sources:
+      - pattern: $REQ.query
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: exec($COMMAND, ...)
+              - pattern: $CHILD_PROCESS.exec($COMMAND, ...)
+          - focus-metavariable: $COMMAND
