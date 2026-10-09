@@ -102,7 +102,7 @@ jobs:
             --volume "$GITHUB_WORKSPACE/reports:/reports" \
             --workdir /src \
             "$SEMGREP_IMAGE" \
-            semgrep scan --config=auto --config=.semgrep/rules \
+            semgrep scan --config=p/default --config=.semgrep/rules \
               --exclude=.semgrep --exclude=tests --exclude=node_modules --exclude=reports \
               --error --severity=ERROR --metrics=off \
               --sarif --output=/reports/semgrep.sarif .
