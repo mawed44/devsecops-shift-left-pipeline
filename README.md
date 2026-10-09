@@ -12,7 +12,7 @@ Des secrets exposés, du code dangereux ou des bibliothèques vulnérables peuve
 
 ### Solution apportée
 
-Le [workflow](.github/workflows/evsecops-pipeline.yml) exécute trois scans complémentaires en parallèle et fait échouer les contrôles non conformes. Une application Node.js/Express volontairement vulnérable sert de support de démonstration, à utiliser dans un environnement de laboratoire isolé.
+Le [workflow](.github/workflows/evsecops-pipeline.yml) exécute trois scans complémentaires en parallèle et fait échouer les contrôles non conformes. L'application Node.js/Express de démonstration accepte uniquement l'action `/exec?cmd=node-version`, exécutée sans shell avec des arguments fixes.
 
 ### Piliers de sécurité intégrés
 
@@ -44,7 +44,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm test
 ```
 
-Le job **Tests** vérifie les réponses HTTP avec une exécution de commandes simulée, puis teste la [règle Semgrep](.semgrep/rules/query-to-exec.yml) sur des exemples vulnérables et sûrs. L'application reste volontairement vulnérable : les tests peuvent réussir tandis que les scans de sécurité échouent.
+Le job **Tests** vérifie les réponses HTTP et le rejet des tentatives d'injection avec une exécution de processus simulée. Il teste ensuite la [règle Semgrep](.semgrep/rules/query-to-exec.yml) sur des exemples vulnérables et sûrs, conservés uniquement dans les fixtures de test.
 
 ### Licence
 

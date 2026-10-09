@@ -1,5 +1,5 @@
 const express = require('express');
-const { exec } = require('child_process');
+const { execFile } = require('node:child_process');
 const app = express();
 const port = 3000;
 
@@ -9,10 +9,19 @@ app.get('/exec', (req, res) => {
     return res.status(400).send('Le paramètre cmd doit être une chaîne non vide.');
   }
 
-  // Code intentionnellement non sécurisé pour tester Semgrep
-  exec(userInput, (err, stdout) => {
-    if (err) return res.status(500).send(err.message);
-    res.send(stdout);
+  if (userInput !== 'node-version') {
+    return res.status(400).send('Commande non autorisée. Utilisez node-version.');
+  }
+
+  // Aucun paramètre HTTP n'est transmis au processus et aucun shell n'est lancé.
+  execFile(process.execPath, ['--version'], {
+    shell: false,
+    timeout: 5000,
+    maxBuffer: 64 * 1024,
+    windowsHide: true,
+  }, (err, stdout) => {
+    if (err) return res.status(500).send('Impossible de lire la version de Node.js.');
+    res.type('text/plain').send(stdout);
   });
 });
 
